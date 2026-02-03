@@ -41,7 +41,17 @@
 - **Smart Context:** Remembers previous questions for follow-ups (e.g., "Is it true?" -> "Who said that?").
 - **Voice Input:** Speak your claims directly using the microphone integration.
 
-### 📱 Modern & Responsive UI
+### � Truth Card Generator
+- **Shareable Images:** Generate stunning 1080x1080 social media cards of verification results.
+- **Smart Filenames:** Downloads as `NoCap_[claim]_[verdict].png` for easy organization.
+- **Premium Design:** Dynamic gradients, glassmorphism effects, and professional typography.
+
+### 🧩 Browser Extension
+- **Right-Click Verification:** Verify selected text on any webpage instantly.
+- **Zero Friction:** No need to switch tabs or copy-paste.
+- **Works Everywhere:** Twitter, news sites, forums - select, right-click, verify!
+
+### �📱 Modern & Responsive UI
 - **Glassmorphism Design:** A premium, modern interface with smooth animations and dark mode aesthetics.
 - **URL Auto-Detection:** Automatically switches mode when a link is pasted to analyze the article content.
 
@@ -102,6 +112,16 @@ npm run dev
 ```
 The application will be accessible at `http://localhost:5173`.
 
+### 4. Browser Extension (Optional)
+To use the Chrome/Edge extension:
+```bash
+1. Open chrome://extensions
+2. Enable "Developer Mode"
+3. Click "Load Unpacked"
+4. Select the NoCapAI/extension folder
+```
+Then right-click selected text on any webpage and choose "Verify with NoCap AI"!
+
 ---
 
 ## 📁 Project Structure
@@ -122,6 +142,12 @@ NoCapAI/
 │   │   └── main.jsx    # Entry Point
 │   ├── index.css       # Tailwind & Glassmorphism Styles
 │   └── vite.config.js
+│
+├── extension/          # Browser Extension
+│   ├── manifest.json   # Extension Config
+│   ├── background.js   # Service Worker
+│   ├── content.js      # Overlay UI
+│   └── popup.html      # Extension Popup
 │
 └── README.md           # Project Documentation
 ```
