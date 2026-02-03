@@ -1,0 +1,27 @@
+# Ignore Python virtual environment
+venv/
+env/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Ignore environment variables
+.env
+
+# Ignore FAISS indices (they will be generated)
+faiss_index/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore logs
+*.log

@@ -1,0 +1,29 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-dotenv==1.0.0
+pydantic==2.5.0
+pymongo==4.6.0
+
+# LangChain and LLM
+langchain==0.1.0
+langchain-google-genai==0.0.5
+google-generativeai>=0.8.3
+
+# Embeddings and Vector Store
+sentence-transformers==2.5.1  # Updated for compatibility with modern huggingface_hub
+faiss-cpu==1.7.4
+numpy==1.24.3
+
+# Web Scraping and Search
+beautifulsoup4==4.12.2
+requests==2.31.0
+duckduckgo-search==4.1.1
+lxml==4.9.3
+
+# PDF Processing
+PyPDF2==3.0.1
+
+# Utilities
+python-multipart==0.0.6
+slowapi==0.1.9
+easyocr>=1.7.0
