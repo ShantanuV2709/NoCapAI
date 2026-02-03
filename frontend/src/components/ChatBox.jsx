@@ -8,8 +8,11 @@ import {
     FiUser,
     FiMessageSquare,
     FiCamera,
-    FiX
+    FiX,
+    FiShare2,
+    FiDownload
 } from 'react-icons/fi';
+import html2canvas from 'html2canvas';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 
@@ -30,6 +33,7 @@ const ChatBox = () => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
+    const cardRef = useRef(null);
 
     // Extract verdict from AI response
     const extractVerdict = (answer) => {
@@ -109,6 +113,33 @@ const ChatBox = () => {
         setPreviewUrl(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+    };
+
+    // Generate and Download Truth Card
+    const handleDownloadCard = async () => {
+        if (!cardRef.current) return;
+
+        try {
+            const canvas = await html2canvas(cardRef.current, {
+                backgroundColor: null,
+                scale: 2, // Retina quality
+                logging: false,
+                useCORS: true // For images
+            });
+
+            // Create filename from question
+            const slug = currentResult?.question
+                ? currentResult.question.substring(0, 30).replace(/[^a-z0-9]/gi, '_').toLowerCase()
+                : 'verdict';
+
+            const link = document.createElement('a');
+            link.download = `NoCap_${slug}_${currentResult?.verdict}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error("Card generation failed:", err);
+            setError("Failed to generate card. Please try again.");
         }
     };
 
@@ -385,12 +416,21 @@ const ChatBox = () => {
                                     {/* Result Header */}
                                     <div className="flex flex-wrap gap-4 items-center justify-between">
                                         <h2 className="text-2xl font-bold">Analysis Result</h2>
-                                        <div className={`px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md border ${currentResult?.verdict === 'FAKE' ? 'bg-red-500/30 text-red-300 border-red-500/50' :
-                                            currentResult?.verdict === 'MISLEADING' ? 'bg-yellow-500/30 text-yellow-300 border-yellow-500/50' :
-                                                currentResult?.verdict === 'CREDIBLE' ? 'bg-green-500/30 text-green-300 border-green-500/50' :
-                                                    'bg-gray-500/30 text-gray-300 border-gray-500/50'
-                                            }`}>
-                                            {currentResult?.verdict} ({currentResult?.confidence}%)
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleDownloadCard}
+                                                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition text-sm text-gray-200"
+                                                title="Download Truth Card"
+                                            >
+                                                <FiShare2 /> Share
+                                            </button>
+                                            <div className={`px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md border ${currentResult?.verdict === 'FAKE' ? 'bg-red-500/30 text-red-300 border-red-500/50' :
+                                                currentResult?.verdict === 'MISLEADING' ? 'bg-yellow-500/30 text-yellow-300 border-yellow-500/50' :
+                                                    currentResult?.verdict === 'CREDIBLE' ? 'bg-green-500/30 text-green-300 border-green-500/50' :
+                                                        'bg-gray-500/30 text-gray-300 border-gray-500/50'
+                                                }`}>
+                                                {currentResult?.verdict} ({currentResult?.confidence}%)
+                                            </div>
                                         </div>
                                     </div>
 
@@ -420,6 +460,62 @@ const ChatBox = () => {
                     </div>
                 </div>
             </div>
+            {/* Hidden Truth Card for Export */}
+            {currentResult && (
+                <div style={{ position: 'fixed', top: '-3000px', left: '-3000px' }}>
+                    <div
+                        ref={cardRef}
+                        className={`w-[1080px] h-[1080px] p-16 flex flex-col justify-between relative overflow-hidden font-sans
+                            ${currentResult.verdict === 'FAKE' ? 'bg-gradient-to-br from-red-950 via-gray-900 to-black' :
+                                currentResult.verdict === 'CREDIBLE' ? 'bg-gradient-to-br from-green-950 via-gray-900 to-black' :
+                                    'bg-gradient-to-br from-yellow-950 via-gray-900 to-black'}
+                        `}
+                    >
+                        {/* Background Elements */}
+                        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-white opacity-[0.03] rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-white opacity-[0.03] rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2"></div>
+
+                        {/* Decor */}
+                        <div className="absolute top-8 right-8 text-white/20 text-xl font-mono tracking-widest">VERIFIED</div>
+
+                        {/* Content */}
+                        <div className="z-10">
+                            <h2 className="text-5xl font-bold text-white mb-12 flex items-center gap-4">
+                                <img src="/logo.png" alt="NoCap Logo" className="w-20 h-20 rounded-full border-4 border-white/10 shadow-lg" />
+                                NoCap AI
+                            </h2>
+
+                            <div className="bg-white/10 backdrop-blur-xl border border-white/10 p-12 rounded-3xl mb-12 shadow-2xl">
+                                <p className="text-white/60 text-3xl mb-6 font-mono tracking-wide">CLAIM:</p>
+                                <p className="text-white text-4xl font-medium leading-normal">
+                                    "{currentResult.question}"
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Verdict Stamp */}
+                        <div className="z-10 text-center relative mb-12 flex flex-col items-center">
+                            <div className={`
+                                inline-block text-7xl font-black tracking-widest px-12 py-6 border-[10px] rounded-3xl transform -rotate-3 shadow-[0_0_100px_rgba(0,0,0,0.5)] backdrop-blur-sm uppercase
+                                ${currentResult.verdict === 'FAKE' ? 'text-red-500 border-red-500 shadow-red-500/20' :
+                                    currentResult.verdict === 'CREDIBLE' ? 'text-green-500 border-green-500 shadow-green-500/20' :
+                                        'text-yellow-500 border-yellow-500 shadow-yellow-500/20'}
+                            `}>
+                                {currentResult.verdict}
+                            </div>
+                            <p className="text-white/40 mt-8 text-2xl font-mono uppercase tracking-[0.5em]">
+                                Confidence: {currentResult.confidence}%
+                            </p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="z-10 flex justify-between items-center border-t border-white/10 pt-8">
+                            <p className="text-white/40 text-2xl">nocap-ai.com</p>
+                            <p className="text-white/40 text-2xl">{new Date().toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
