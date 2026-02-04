@@ -18,6 +18,10 @@
 
 ---
 
+> Want to see how everything works? Check out the [Visual Project Workflow](project_workflow.md) with 12+ interactive architecture diagrams and data flow visualizations.
+
+---
+
 ## 🚀 Overview
 
 **NoCap AI** is a state-of-the-art fake news detection solution designed to bring transparency to information. It replaces uncertainty with evidence-backed verdicts. Whether you are verifying a viral tweet, checking a news article, or analyzing a screenshot, NoCap AI provides instant, explainable credibility scores using Google's Gemini AI and real-time DuckDuckGo search.
@@ -56,6 +60,7 @@
 - **URL Auto-Detection:** Automatically switches mode when a link is pasted to analyze the article content.
 
 ---
+
 
 ## 🛠️ Tech Stack
 
