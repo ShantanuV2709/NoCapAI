@@ -69,7 +69,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 // Function to call NoCap AI Backend
 async function verifyText(text) {
     try {
-        const response = await fetch('http://localhost:8000/ask', {
+        const response = await fetch('http://127.0.0.1:8000/ask', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

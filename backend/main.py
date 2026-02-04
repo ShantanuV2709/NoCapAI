@@ -84,7 +84,7 @@ def llm_invoke(prompt: str) -> str:
             return "VERDICT: UNKNOWN\n\nError: AI rate limit exceeded. Please try again in a minute."
         return f"VERDICT: UNKNOWN\n\nError generating response: {str(e)}"
 
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -93,19 +93,41 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Force Backend Reload for .env update
+
 # Rate limiting
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Hardcode permissive CORS for debugging
+CORS_ORIGINS = ["*"]
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_pna_header(request: Request, call_next):
+    # Handle preflight requests explicitly if needed by some browsers
+    if request.method == "OPTIONS":
+        response = JSONResponse(content={"message": "OK"})
+        # Reflect origin or default to *
+        origin = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
+
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 # ==================== REQUEST/RESPONSE MODELS ====================
 
