@@ -474,9 +474,9 @@ graph LR
     end
     
     subgraph "Core Services"
-        M[rag.py<br/>RAGSystem Class]
-        N[db.py<br/>DatabaseManager Class]
-        O[main.py<br/>process_verification()]
+        M["rag.py<br/>RAGSystem Class"]
+        N["db.py<br/>DatabaseManager Class"]
+        O["main.py<br/>process_verification()"]
     end
     
     subgraph "External Tools"
