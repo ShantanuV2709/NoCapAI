@@ -21,10 +21,10 @@ graph TB
     end
     
     subgraph "API Layer - FastAPI"
-        G[/ask Endpoint - Text Verification]
-        H[/analyze_image - OCR + Verification]
-        I[/ask_web - URL Scraping]
-        J[/duckduckgo_verify - Web Search]
+        G[ask Endpoint - Text Verification]
+        H[analyze_image - OCR + Verification]
+        I[ask_web - URL Scraping]
+        J[duckduckgo_verify - Web Search]
         K[Rate Limiter - 10 req/min]
         L[CORS Middleware + PNA Headers]
     end
@@ -466,11 +466,11 @@ graph LR
     end
     
     subgraph "Backend Routes"
-        H[/ask<br/>Text Verification]
-        I[/analyze_image<br/>OCR Pipeline]
-        J[/ask_web<br/>URL Scraping]
-        K[/duckduckgo_verify<br/>Web Search]
-        L[/upload_pdf<br/>PDF Processing]
+        H[ask<br/>Text Verification]
+        I[analyze_image<br/>OCR Pipeline]
+        J[ask_web<br/>URL Scraping]
+        K[duckduckgo_verify<br/>Web Search]
+        L[upload_pdf<br/>PDF Processing]
     end
     
     subgraph "Core Services"
