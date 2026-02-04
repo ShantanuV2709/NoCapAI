@@ -554,10 +554,13 @@ async def ask_web(request: Request, web_request: AskWebRequest):
         )
         
         return {
+            "question": question,
             "answer": answer,
             "source_url": url,
             "chunks_processed": rag_result.get("chunks_added", 0),
             "confidence": confidence,
+            "source_type": "web",
+            "sources": [{"url": url, "chunks": len(retrieved)}],
             "session_id": session_id,
             "timestamp": datetime.utcnow().isoformat()
         }
