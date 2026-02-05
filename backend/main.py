@@ -840,6 +840,16 @@ async def get_session_history(session_id: str):
         "count": len(history)
     }
 
+@app.get("/trending")
+async def get_trending_debunks():
+    """Get top 5 trending fake news topics"""
+    try:
+        trends = db_manager.get_trending_stats(limit=5)
+        return {"trends": trends}
+    except Exception as e:
+        print(f"Error fetching trending: {e}")
+        return {"trends": []}
+
 # ==================== ERROR HANDLERS ====================
 
 @app.exception_handler(HTTPException)

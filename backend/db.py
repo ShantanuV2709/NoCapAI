@@ -154,8 +154,55 @@ class DatabaseManager:
                         msg["answer"] = f"VERDICT: {doc['prediction'].upper()}\\n\\n(Historical Record)"
                     
                     messages.append(msg)
+        
+        # Sort by timestamp descending
+        messages.sort(key=lambda x: x["timestamp"], reverse=True)
+        return messages[:limit]
 
-        return messages
+    # ==================== ANALYTICS OPERATIONS ====================
+
+    def get_trending_stats(self, limit: int = 5) -> List[Dict]:
+        """
+        Get trending fake news topics based on frequency of similar questions
+        """
+        try:
+            pipeline = [
+                # 1. Filter for detected Fake/Misleading logs
+                {"$match": {
+                    "prediction": {"$in": ["Fake", "Misleading", "Scam"]},
+                    "timestamp": {"$gte": datetime.utcnow().replace(hour=0, minute=0, second=0)} # Today's trends
+                }},
+                # 2. Group by query (simple normalization)
+                {"$group": {
+                    "_id": "$question",
+                    "count": {"$sum": 1},
+                    "verdict": {"$first": "$prediction"},
+                    "last_seen": {"$max": "$timestamp"}
+                }},
+                # 3. Sort by popularity
+                {"$sort": {"count": -1}},
+                # 4. Limit
+                {"$limit": limit}
+            ]
+            
+            # If no trends today, get all time
+            results = list(self.chat_history.aggregate(pipeline))
+            if not results:
+                pipeline[0]["$match"] = {"prediction": {"$in": ["Fake", "Misleading", "Scam"]}}
+                results = list(self.chat_history.aggregate(pipeline))
+
+            return [
+                {
+                    "query": doc["_id"],
+                    "count": doc["count"],
+                    "verdict": doc["verdict"],
+                    "id": hashlib.md5(doc["_id"].encode()).hexdigest()
+                }
+                for doc in results
+            ]
+        except Exception as e:
+            print(f"⚠️ Error fetching trending stats: {e}")
+            return []
     
     def get_last_conversation(self, session_id: str) -> Optional[Dict]:
         """Get the last Q&A pair from chat_history"""

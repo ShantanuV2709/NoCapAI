@@ -20,8 +20,17 @@ import SkeletonLoader from './SkeletonLoader';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-const ChatBox = () => {
+const ChatBox = ({ selectedQuery }) => {
+    // State
+    const [messages, setMessages] = useState([]);
     const [inputValue, setInputValue] = useState('');
+
+    // Effect to handle selected query from Sidebar
+    useEffect(() => {
+        if (selectedQuery) {
+            setInputValue(selectedQuery);
+        }
+    }, [selectedQuery]);
     const [isLoading, setIsLoading] = useState(false);
     const [sessionId, setSessionId] = useState('');
     const [error, setError] = useState('');

@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ChatBox from './components/ChatBox';
 import ColorBends from './components/ColorBends';
+import TrendingSidebar from './components/TrendingSidebar';
 
 function App() {
+    const [selectedQuery, setSelectedQuery] = useState(null);
+
     return (
-        <div className="relative min-h-screen overflow-hidden bg-[#0b0f1a]">
+        <div className="relative min-h-screen overflow-hidden bg-[#0b0f1a] flex">
             {/* ColorBends Three.js Background */}
             <div className="fixed inset-0 z-0">
                 <ColorBends
@@ -23,12 +26,18 @@ function App() {
             </div>
 
             {/* Dark overlay to reduce eye strain */}
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-[1]" />
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1]" />
 
-            {/* Main content */}
-            <div className="relative z-10 h-screen">
-                <ChatBox />
+            {/* Main content Area */}
+            <div className="relative z-10 flex-1 h-screen flex flex-col pointer-events-none">
+                {/* ChatBox Container - restore pointer events */}
+                <div className="flex-1 pointer-events-auto">
+                    <ChatBox selectedQuery={selectedQuery} />
+                </div>
             </div>
+
+            {/* Sidebar (Right) */}
+            <TrendingSidebar onSelectQuery={setSelectedQuery} />
         </div>
     );
 }
