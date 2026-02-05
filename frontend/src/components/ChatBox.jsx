@@ -10,11 +10,13 @@ import {
     FiCamera,
     FiX,
     FiShare2,
-    FiDownload
+    FiDownload,
+    FiFile
 } from 'react-icons/fi';
 import html2canvas from 'html2canvas';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
+import SkeletonLoader from './SkeletonLoader';
 
 const API_BASE_URL = 'http://localhost:8000';
 
@@ -33,6 +35,7 @@ const ChatBox = () => {
     const [previewUrl, setPreviewUrl] = useState(null);
     const textareaRef = useRef(null);
     const fileInputRef = useRef(null);
+    const pdfInputRef = useRef(null);
     const cardRef = useRef(null);
 
     // Extract verdict from AI response
@@ -156,12 +159,14 @@ const ChatBox = () => {
             let response;
 
             if (selectedFile) {
-                // Image Analysis
+                // Image or PDF Analysis
                 const formData = new FormData();
                 formData.append('file', selectedFile);
                 formData.append('session_id', sessionId);
 
-                response = await axios.post(`${API_BASE_URL}/analyze_image`, formData, {
+                const endpoint = selectedFile.type === 'application/pdf' ? '/analyze_pdf' : '/analyze_image';
+
+                response = await axios.post(`${API_BASE_URL}${endpoint}`, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
 
@@ -188,7 +193,7 @@ const ChatBox = () => {
             // Common Result Handling
             const result = {
                 id: uuidv4(),
-                question: response.data.question || userInput || "Image Analysis",
+                question: response.data.question || userInput || (selectedFile ? selectedFile.name : "Analysis"),
                 answer: response.data.answer,
                 verdict: extractVerdict(response.data.answer),
                 confidence: response.data.confidence,
@@ -312,7 +317,7 @@ const ChatBox = () => {
                 <div className="flex-1 overflow-y-auto p-4 sm:p-8">
                     <div className="w-full max-w-6xl mx-auto min-h-full flex flex-col justify-center"> {/* Increased max-width and added horizontal padding */}
                         <AnimatePresence mode="wait">
-                            {!showResult ? (
+                            {!showResult && !isLoading ? (
                                 <motion.div
                                     key="input"
                                     initial={{ opacity: 0, y: 20 }}
@@ -342,29 +347,34 @@ const ChatBox = () => {
                                             onKeyPress={handleKeyPress}
                                             placeholder="Paste article text here..."
                                             disabled={isLoading}
-                                            className="w-full bg-transparent text-white placeholder-gray-400 p-6 pr-16 resize-none focus:outline-none min-h-[120px] max-h-[400px]"
+                                            className="w-full bg-transparent text-white placeholder-gray-400 p-6 pr-16 pb-16 resize-none focus:outline-none min-h-[120px] max-h-[400px]"
                                             rows={3}
                                             style={{ display: previewUrl ? 'none' : 'block' }}
                                         />
 
                                         {/* Image Preview */}
-                                        {previewUrl && (
-                                            <div className="p-6 relative">
-                                                <div className="relative inline-block">
-                                                    <img src={previewUrl} alt="Preview" className="max-h-60 rounded-xl border border-white/20" />
+                                        {/* File Preview (Compact Pill) */}
+                                        {selectedFile && (
+                                            <div className="absolute top-4 left-4 right-16 flex flex-wrap gap-2 pointer-events-none">
+                                                <div className="pointer-events-auto flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full text-sm text-white shadow-lg animate-fade-in">
+                                                    {selectedFile.type === 'application/pdf' ? (
+                                                        <FiFile className="text-pink-400" />
+                                                    ) : (
+                                                        <img src={previewUrl} alt="Thumbnail" className="w-6 h-6 rounded object-cover border border-white/30" />
+                                                    )}
+                                                    <span className="truncate max-w-[150px]">{selectedFile.name}</span>
                                                     <button
                                                         onClick={removeImage}
-                                                        className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1 text-white shadow-lg hover:bg-red-600 transition"
+                                                        className="ml-1 hover:text-red-400 transition-colors p-0.5 rounded-full hover:bg-white/10"
                                                     >
-                                                        <FiX size={12} />
+                                                        <FiX size={14} />
                                                     </button>
                                                 </div>
-                                                <p className="text-sm text-gray-400 mt-2">Image selected. Click Analyze.</p>
                                             </div>
                                         )}
 
-                                        {/* Actions */}
-                                        <div className="absolute bottom-4 left-4">
+                                        {/* Action Bar (Glassmorphic Pill) */}
+                                        <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-white/5 border border-white/10 p-1.5 rounded-xl backdrop-blur-sm transition-all hover:bg-white/10">
                                             <input
                                                 type="file"
                                                 ref={fileInputRef}
@@ -372,12 +382,32 @@ const ChatBox = () => {
                                                 accept="image/*"
                                                 className="hidden"
                                             />
+                                            <input
+                                                type="file"
+                                                ref={pdfInputRef}
+                                                onChange={handleFileChange}
+                                                accept="application/pdf"
+                                                className="hidden"
+                                            />
+
                                             <button
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="p-2 text-gray-400 hover:text-white transition-colors hover:bg-white/10 rounded-lg"
+                                                className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-all group relative"
                                                 title="Upload Image"
                                             >
-                                                <FiCamera size={24} />
+                                                <FiCamera size={20} />
+                                                <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">Upload Image</span>
+                                            </button>
+
+                                            <div className="w-px h-6 bg-white/10" /> {/* Divider */}
+
+                                            <button
+                                                onClick={() => pdfInputRef.current?.click()}
+                                                className="p-2 text-gray-400 hover:text-pink-400 hover:bg-white/10 rounded-lg transition-all group relative"
+                                                title="Upload PDF"
+                                            >
+                                                <FiFile size={20} />
+                                                <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">Upload Document</span>
                                             </button>
                                         </div>
                                         <button
@@ -404,6 +434,15 @@ const ChatBox = () => {
                                             {error}
                                         </div>
                                     )}
+                                </motion.div>
+                            ) : isLoading ? (
+                                <motion.div
+                                    key="loading"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                >
+                                    <SkeletonLoader />
                                 </motion.div>
                             ) : (
                                 <motion.div

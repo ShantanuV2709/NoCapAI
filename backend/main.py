@@ -13,6 +13,12 @@ import uuid
 import re
 from datetime import datetime
 import asyncio
+import time
+import hashlib
+
+# Caching Configuration
+RESPONSE_CACHE = {}
+CACHE_TTL = 3600  # 1 hour in seconds
 
 # LangChain and LLM imports
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -36,9 +42,12 @@ import numpy as np
 from PIL import Image
 
 # Initialize EasyOCR Reader globally
-print("Initialzing EasyOCR...")
+import torch
+print("Initializing EasyOCR...")
 try:
-    ocr_reader = easyocr.Reader(['en'], gpu=False) # GPU=False for compatibility
+    use_gpu = torch.cuda.is_available()
+    print(f"EasyOCR GPU Mode: {'ENABLED 🚀' if use_gpu else 'DISABLED 🐢'}")
+    ocr_reader = easyocr.Reader(['en'], gpu=use_gpu)
     print("EasyOCR initialized successfully.")
 except Exception as e:
     print(f"⚠️ EasyOCR initialization failed: {e}")
@@ -200,16 +209,20 @@ Claim: {question}
 Additional Context: {context}
 
 Your task:
-1. Determine if the claim is FAKE, MISLEADING, or CREDIBLE
-2. Provide a BRIEF reasoning (2-3 sentences max)
-3. List 2-3 key evidence points only
+1. Identify if the text contains a SINGLE claim or MULTIPLE distinct claims.
+2. If MULTIPLE: Analyze the top 3 most controversial claims separately.
+3. Determine if they are FAKE, MISLEADING, or CREDIBLE.
+4. Provide a collective verdict (e.g., "MIXED" if they differ).
 
 Format your response as:
 
-VERDICT: [FAKE/MISLEADING/CREDIBLE]
+VERDICT: [FAKE/MISLEADING/CREDIBLE/MIXED]
 
 EXPLANATION:
-[Concise 2-3 sentence summary of why]
+[Summary of the main findings. If multiple claims, list them:]
+1. [Claim 1 Subject]: [Status] - [Brief Reason]
+2. [Claim 2 Subject]: [Status] - [Brief Reason]
+(Limit to 3 sentences total for global summary)
 
 EVIDENCE:
 - [Key point 1]
@@ -259,6 +272,14 @@ async def root():
 
 async def process_verification(question: str, session_id: str) -> dict:
     """Core verification logic shared by text and image endpoints"""
+    
+    # Check Cache
+    query_hash = hashlib.md5(question.lower().strip().encode()).hexdigest()
+    if query_hash in RESPONSE_CACHE:
+        entry = RESPONSE_CACHE[query_hash]
+        if time.time() - entry['timestamp'] < CACHE_TTL:
+            print(f"🚀 Returning cached response for: {question[:30]}...")
+            return entry['data']
     
     # Get session context
     last_conversation = db_manager.get_last_conversation(session_id)
@@ -359,7 +380,7 @@ async def process_verification(question: str, session_id: str) -> dict:
     verdict_match = re.search(r'VERDICT:\s*(FAKE|MISLEADING|CREDIBLE)', answer, re.IGNORECASE)
     verdict = verdict_match.group(1) if verdict_match else "UNKNOWN"
 
-    return {
+    result = {
         "answer": answer,
         "confidence": confidence,
         "source_type": source_type,
@@ -367,6 +388,11 @@ async def process_verification(question: str, session_id: str) -> dict:
         "verdict": verdict,
         "web_verification": web_verification
     }
+    
+    # Save to Cache
+    RESPONSE_CACHE[query_hash] = {'data': result, 'timestamp': time.time()}
+    
+    return result
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -377,6 +403,9 @@ async def ask_question(request: Request, ask_request: AskRequest):
     """
     question = sanitize_input(ask_request.question)
     session_id = ask_request.session_id or generate_session_id()
+    
+    # Update Session Activity
+    db_manager.create_or_update_session(session_id, context={"last_action": "text_query", "last_question": question[:50]})
     
     result = await process_verification(question, session_id)
     
@@ -418,6 +447,8 @@ async def analyze_image(
     """
     Analyze image for fake news using EasyOCR + Verification Pipeline
     """
+    # Update Session Activity
+    db_manager.create_or_update_session(session_id, context={"last_action": "image_analysis"})
     if not ocr_reader:
         raise HTTPException(status_code=503, detail="OCR service is unavailable")
 
@@ -477,6 +508,9 @@ async def ask_web(request: Request, web_request: AskWebRequest):
     """
     session_id = web_request.session_id or generate_session_id()
     
+    # Update Session Activity
+    db_manager.create_or_update_session(session_id, context={"last_action": "web_scan", "url": web_request.url})
+    
     if not web_request.url:
         raise HTTPException(status_code=400, detail="URL is required")
     
@@ -484,11 +518,21 @@ async def ask_web(request: Request, web_request: AskWebRequest):
     question = sanitize_input(web_request.question) if web_request.question else "Summarize this article and assess its credibility"
     
     try:
-        # Scrape the website
+        # Scrape the website with comprehensive headers to bypass basic blocks
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
         
         # Parse HTML
@@ -569,6 +613,68 @@ async def ask_web(request: Request, web_request: AskWebRequest):
         raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing web content: {str(e)}")
+
+@app.post("/analyze_pdf")
+async def analyze_pdf(
+    file: UploadFile = File(...),
+    session_id: str = Form(...)
+):
+    """
+    Analyze PDF content for fake news
+    """
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    # Update Session Activity
+    db_manager.create_or_update_session(session_id, context={"last_action": "pdf_analysis"})
+
+    try:
+        # Read PDF content
+        content = await file.read()
+        pdf_file = io.BytesIO(content)
+        
+        # Extract text
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        extracted_text = ""
+        for page in pdf_reader.pages:
+            text = page.extract_text()
+            if text:
+                extracted_text += text + "\n\n"
+        
+        extracted_text = extracted_text.strip()
+        print(f"Extracted PDF Text: {extracted_text[:100]}...")
+        
+        if not extracted_text or len(extracted_text) < 50:
+             return JSONResponse(
+                status_code=400,
+                content={"error": "Could not extract sufficient text from the PDF. It might be scanned or empty."}
+            )
+            
+        # Verify the extracted claim
+        result = await process_verification(extracted_text, session_id)
+        
+        db_manager.save_chat_message(
+            session_id=session_id,
+            question=f"[PDF] {file.filename}: {extracted_text[:100]}...",
+            answer=result['answer'],
+            source_type="pdf_analysis", # Distinct from RAG
+            confidence=result['confidence'],
+            sources=result['sources']
+        )
+        
+        return {
+            "question": extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
+            "answer": result['answer'],
+            "confidence": result['confidence'],
+            "source_type": result['source_type'],
+            "sources": result['sources'],
+            "session_id": session_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        print(f"PDF analysis failed: {e}")
+        return JSONResponse(status_code=500, content={"error": f"Failed to process PDF: {str(e)}"})
 
 @app.post("/upload_pdf")
 @limiter.limit("20/minute")

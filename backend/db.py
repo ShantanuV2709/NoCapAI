@@ -102,8 +102,8 @@ class DatabaseManager:
             "timestamp": datetime.utcnow()
         }
         
-        # Save to news_article as requested
-        result = self.news_article.insert_one(document)
+        # Save to chat_history (Correct Collection)
+        result = self.chat_history.insert_one(document)
         return str(result.inserted_id)
     
     def get_session_history(
@@ -112,38 +112,54 @@ class DatabaseManager:
         limit: int = 20
     ) -> List[Dict]:
         """
-        Get chat history from news_article collection
-        Fetches both session-specific and global legacy items
+        Get chat history from chat_history collection (with legacy fallback)
         """
-        # Fetch from news_article
-        # We fetch recent items regardless of session_id to show "past searches" 
-        # as requested by the user, since legacy items have no session_id
-        cursor = self.news_article.find().sort("timestamp", -1).limit(limit)
-        
         messages = []
-        for doc in cursor:
-            # Map legacy fields to expected schema
-            msg = {
+        
+        # 1. Fetch from new Schema (chat_history)
+        cursor_new = self.chat_history.find().sort("timestamp", -1).limit(limit)
+        
+        for doc in cursor_new:
+            messages.append({
                 "_id": str(doc["_id"]),
-                "session_id": doc.get("session_id", "legacy"),
-                "question": doc.get("question", doc.get("text", "")),
-                "answer": doc.get("answer", ""),
-                "source_type": doc.get("source_type", "legacy"),
+                "session_id": doc.get("session_id"),
+                "question": doc.get("question"),
+                "answer": doc.get("answer"),
+                "source_type": doc.get("source_type"),
                 "confidence": doc.get("confidence", 0.0),
                 "timestamp": doc.get("timestamp")
-            }
+            })
             
-            # If answer is missing (legacy data), construct one from prediction
-            if not msg["answer"] and "prediction" in doc:
-                msg["answer"] = f"VERDICT: {doc['prediction'].upper()}\\n\\n(Historical Record)"
+        # 2. Fetch from Legacy Schema (news_article) if we need more
+        if len(messages) < limit:
+            remaining = limit - len(messages)
+            # Exclude items that might be in both (unlikely given separate collections)
+            cursor_legacy = self.news_article.find().sort("timestamp", -1).limit(remaining)
             
-            messages.append(msg)
-            
+            for doc in cursor_legacy:
+                # Only add if it looks like a chat message (has answer/prediction)
+                # and isn't just a raw article
+                if "answer" in doc or "prediction" in doc:
+                    msg = {
+                        "_id": str(doc["_id"]),
+                        "session_id": doc.get("session_id", "legacy"),
+                        "question": doc.get("question", doc.get("text", "")),
+                        "answer": doc.get("answer", ""),
+                        "source_type": doc.get("source_type", "legacy"),
+                        "confidence": doc.get("confidence", 0.0),
+                        "timestamp": doc.get("timestamp")
+                    }
+                     # If answer is missing (legacy data), construct one from prediction
+                    if not msg["answer"] and "prediction" in doc:
+                        msg["answer"] = f"VERDICT: {doc['prediction'].upper()}\\n\\n(Historical Record)"
+                    
+                    messages.append(msg)
+
         return messages
     
     def get_last_conversation(self, session_id: str) -> Optional[Dict]:
-        """Get the last Q&A pair for a session from news_article"""
-        result = self.news_article.find_one(
+        """Get the last Q&A pair from chat_history"""
+        result = self.chat_history.find_one(
             {"session_id": session_id},
             sort=[("timestamp", -1)]
         )
