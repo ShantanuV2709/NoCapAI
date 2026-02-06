@@ -302,7 +302,7 @@ async def process_verification(question: str, session_id: str) -> dict:
             all_sources = []
             reputable_domains = ['reuters.com', 'apnews.com', 'bbc.com', 'cnn.com', 'nytimes.com', 
                                 'theguardian.com', 'washingtonpost.com', 'npr.org', 'factcheck.org',
-                                'snopes.com', 'politifact.com']
+                                'snopes.com', 'politifact.com', 'timesofindia.com', 'indiatoday.in', 'thehindu.com',]
             
             for result in search_results:
                 url = result.get("href", "").lower()
